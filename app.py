@@ -32,13 +32,34 @@ movies_dict = pickle.load(open('movie_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
 # ✅ Auto-download similarity.pkl from Google Drive if not found
 import os
-if not os.path.exists("similarity.pkl"):
-    url = "https://drive.google.com/uc?export=download&id=1P1LgNw01wntsvCbW20gh1GG0V1czL5In"
-    response = requests.get(url)
-    with open("similarity.pkl", "wb") as f:
-        f.write(response.content)
+import pickle
+import requests
 
-similarity = pickle.load(open('similarity.pkl', 'rb'))
+# ✅ Check and download if similarity.pkl is missing
+def download_similarity():
+    url = "https://drive.google.com/uc?export=download&id=1P1LgNw01wntsvCbW20gh1GG0V1czL5In"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        with open("similarity.pkl", "wb") as f:
+            f.write(response.content)
+        return True
+    except Exception as e:
+        print("Error downloading similarity.pkl:", e)
+        return False
+
+# 📦 Ensure the file exists before loading
+if not os.path.exists("similarity.pkl"):
+    success = download_similarity()
+    if not success:
+        st.error("Failed to download similarity.pkl. Please try again later.")
+
+# ✅ Load the file after confirming it's present
+if os.path.exists("similarity.pkl"):
+    similarity = pickle.load(open("similarity.pkl", "rb"))
+else:
+    similarity = None
+
 
 movie_list = movies['title'].values
 selected_movie = st.selectbox(
@@ -46,23 +67,20 @@ selected_movie = st.selectbox(
     movie_list
 )
 
-if st.button('Recommend movies'):
-    recommended_movie_names, recommended_movie_posters = recommend(selected_movie)
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        st.text(recommended_movie_names[0])
-        st.image(recommended_movie_posters[0])
-    with col2:
-        st.text(recommended_movie_names[1])
-        st.image(recommended_movie_posters[1])
+import streamlit as st
 
-    with col3:
-        st.text(recommended_movie_names[2])
-        st.image(recommended_movie_posters[2])
-    with col4:
-        st.text(recommended_movie_names[3])
-        st.image(recommended_movie_posters[3])
-    with col5:
-        st.text(recommended_movie_names[4])
-        st.image(recommended_movie_posters[4])
+if st.button('Recommend movies'):
+    if similarity is None:
+        st.error("Similarity data not available.")
+    else:
+        recommended_movie_names, recommended_movie_posters = recommend(selected_movie)
+
+        # Create columns dynamically based on the number of recommended movies
+        cols = st.columns(len(recommended_movie_names))
+
+        for i, col in enumerate(cols):
+            if i < len(recommended_movie_names):  # Ensure we don't access out-of-range elements
+                with col:
+                    st.text(recommended_movie_names[i])
+                    st.image(recommended_movie_posters[i])
 
